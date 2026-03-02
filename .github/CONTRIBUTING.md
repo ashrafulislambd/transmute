@@ -9,6 +9,15 @@ First off, thank you for your interest in contributing ❤️
 
 This project is intended to be a reliable, self-hosted tool, and contributions of all kinds are welcome: code, documentation, bug reports, ideas, and feedback.
 
+> [!CAUTION]
+> ## No Autonomous Agents or AI Assistants
+>
+> **Fully autonomous agents and AI coding assistants are not welcome contributors to this repository.**
+>
+> Contributions that are determined to have been generated or submitted by an autonomous agent or AI assistant (e.g. automated pull requests, AI-driven code generation tools acting without direct human authorship and review) will be **rejected without review**.
+>
+> All contributions must be authored and meaningfully reviewed by a real human being who takes responsibility for the changes. If you used AI tooling to assist your work, you are expected to have fully understood, reviewed, and validated every line before submitting.
+
 ---
 
 ## Ways to Contribute
