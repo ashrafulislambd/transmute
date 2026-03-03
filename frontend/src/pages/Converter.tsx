@@ -432,15 +432,23 @@ function Converter() {
               <h2 className="text-xl font-semibold text-text">
                 Completed Conversions ({completedConversions.length})
               </h2>
-              {completedConversions.length > 1 && (
+              <div className="flex items-center gap-3">
+                {completedConversions.length > 1 && (
+                  <button
+                    onClick={handleDownloadAll}
+                    disabled={downloadingAll}
+                    className="bg-success hover:bg-success-dark text-white font-semibold py-2 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {downloadingAll ? 'Downloading...' : `Download All ${completedConversions.length} Files`}
+                  </button>
+                )}
                 <button
-                  onClick={handleDownloadAll}
-                  disabled={downloadingAll}
-                  className="bg-success hover:bg-success-dark text-white font-semibold py-2 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setCompletedConversions([])}
+                  className="text-sm text-text-muted hover:text-text border border-surface-dark hover:border-text-muted py-2 px-4 rounded-lg transition duration-200"
                 >
-                  {downloadingAll ? 'Downloading...' : `Download All ${completedConversions.length} Files`}
+                  Clear
                 </button>
-              )}
+              </div>
             </div>
             <div className="space-y-3">
               {completedConversions.map((cc) => (
