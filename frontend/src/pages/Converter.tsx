@@ -21,7 +21,6 @@ function Converter() {
   const [uploadCount, setUploadCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [converting, setConverting] = useState(false)
-  const [convertingIndex, setConvertingIndex] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const [downloadingAll, setDownloadingAll] = useState(false)
@@ -164,61 +163,63 @@ function Converter() {
     setConverting(true)
     setError(null)
 
-    const filesToConvert = [...pendingFiles]
-    const newCompletedConversions: CompletedConversion[] = []
+    const filesToConvert = [...pendingFiles].filter(({ selectedFormat }) => !!selectedFormat)
 
-    for (let i = 0; i < filesToConvert.length; i++) {
-      const { file, selectedFormat } = filesToConvert[i]
-      setConvertingIndex(i)
-
-      if (!selectedFormat) continue
-
+    const promises = filesToConvert.map(async ({ file, selectedFormat }) => {
       const inputFormat = file.extension?.replace(/^\./, '') || ''
 
-      try {
-        const response = await fetch('/api/conversions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: file.id,
-            input_format: inputFormat,
-            output_format: selectedFormat,
-          }),
-        })
+      const response = await fetch('/api/conversions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: file.id,
+          input_format: inputFormat,
+          output_format: selectedFormat,
+        }),
+      })
 
-        if (!response.ok) {
-          throw new Error(`Conversion failed for ${file.original_filename}: ${response.statusText}`)
-        }
-
-        const data = await response.json()
-        const conversionInfo: ConversionInfo = {
-          id: data.id,
-          original_filename: data.original_filename,
-          media_type: data.media_type,
-          extension: data.extension,
-          size_bytes: data.size_bytes,
-          created_at: data.created_at,
-        }
-
-        newCompletedConversions.push({
-          file,
-          conversion: conversionInfo,
-        })
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Conversion failed')
+      if (!response.ok) {
+        throw new Error(`Conversion failed for ${file.original_filename}: ${response.statusText}`)
       }
+
+      const data = await response.json()
+      const conversionInfo: ConversionInfo = {
+        id: data.id,
+        original_filename: data.original_filename,
+        media_type: data.media_type,
+        extension: data.extension,
+        size_bytes: data.size_bytes,
+        created_at: data.created_at,
+      }
+
+      const completed: CompletedConversion = { file, conversion: conversionInfo }
+
+      // Move to completed list immediately as it finishes
+      setCompletedConversions((prev) => [completed, ...prev])
+      setPendingFiles((prev) => prev.filter((pf) => pf.file.id !== file.id))
+
+      if (autoDownload) {
+        await handleDownload(conversionInfo)
+      }
+
+      return completed
+    })
+
+    const results = await Promise.allSettled(promises)
+
+    const errors = results
+      .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+      .map((r) => (r.reason instanceof Error ? r.reason.message : 'Conversion failed'))
+
+    if (errors.length > 0) {
+      setError(errors.join('; '))
     }
 
-    setCompletedConversions((prev) => [...newCompletedConversions, ...prev])
+    // Clear any remaining pending files (e.g. ones that failed)
     setPendingFiles([])
     setConverting(false)
-    setConvertingIndex(null)
-
-    if (autoDownload && newCompletedConversions.length > 0) {
-      await triggerDownloads(newCompletedConversions)
-    }
   }
 
   const triggerDownloads = async (conversions: CompletedConversion[]) => {
@@ -395,9 +396,9 @@ function Converter() {
               Pending Conversions ({pendingFiles.length})
             </h2>
             <div className="space-y-3 mb-4">
-              {pendingFiles.map((pf, index) => (
+              {pendingFiles.map((pf) => (
                 <div key={pf.file.id} className="relative">
-                  {converting && convertingIndex === index && (
+                  {converting && (
                     <div className="absolute inset-0 bg-surface-dark/50 rounded-lg flex items-center justify-center z-10">
                       <span className="text-sm text-primary font-medium">Converting...</span>
                     </div>
@@ -419,7 +420,7 @@ function Converter() {
               className="w-full bg-primary hover:bg-primary-dark text-text font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {converting
-                ? `Converting ${(convertingIndex ?? 0) + 1} of ${pendingFiles.length}...`
+                ? `Converting ${pendingFiles.length} file${pendingFiles.length > 1 ? 's' : ''}...`
                 : `Convert ${pendingFiles.length} File${pendingFiles.length > 1 ? 's' : ''}`}
             </button>
           </div>

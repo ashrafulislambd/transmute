@@ -75,7 +75,7 @@ def list_conversions(
             }
         }
 )
-async def create_conversion(
+def create_conversion(
     conversion_request: ConversionRequest,
     file_db: FileDB = Depends(get_file_db),
     conversion_db: ConversionDB = Depends(get_conversion_db),
