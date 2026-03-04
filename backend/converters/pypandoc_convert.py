@@ -1,6 +1,4 @@
 import os
-import shutil
-import subprocess  # nosec B404
 import pypandoc
 from pathlib import Path
 from typing import Optional
@@ -60,8 +58,9 @@ class PyPandocConverter(ConverterInterface):
         'opml',
     }
 
-    # Ordered list of PDF engines to try; the first one found on PATH wins.
-    _pdf_engines = ['weasyprint', 'pdflatex', 'xelatex', 'lualatex', 'tectonic', 'wkhtmltopdf']
+    # PDF engine to use for PDF output (weasyprint is installed as a Python
+    # dependency and its system libraries are included in the Docker image).
+    _pdf_engine = 'weasyprint'
 
     # Mapping from our format names to Pandoc format identifiers
     _pandoc_format_map = {
@@ -101,43 +100,6 @@ class PyPandocConverter(ConverterInterface):
         """
         super().__init__(input_file, output_dir, input_type, output_type)
 
-    @classmethod
-    def _find_pdf_engine(cls) -> str | None:
-        """
-        Return the first available and functional PDF engine on PATH, or None.
-        Each candidate is verified by running a quick version/help check to
-        ensure it can actually execute (catches architecture mismatches, broken
-        installs, missing shared libraries, etc.).
-        """
-        _check_flags = {
-            'weasyprint': ['--version'],
-            'pdflatex': ['--version'],
-            'xelatex': ['--version'],
-            'lualatex': ['--version'],
-            'tectonic': ['--version'],
-            'wkhtmltopdf': ['--version'],
-        }
-        for engine in cls._pdf_engines:
-            path = shutil.which(engine)
-            if not path:
-                continue
-            try:
-                flags = _check_flags.get(engine, ['--version'])
-                # Subprocess is safe here because the command is constructed
-                # without user input.
-                subprocess.run(  # nosec B603
-                    [path] + flags,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    timeout=10,
-                    check=True,
-                )
-                return engine
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired,
-                    OSError):
-                continue
-        return None
-
     def can_convert(self) -> bool:
         """
         Check if the input file can be converted to the output format.
@@ -170,9 +132,6 @@ class PyPandocConverter(ConverterInterface):
         if fmt not in cls.supported_input_formats:
             return set()
         formats = cls.supported_output_formats - {fmt}
-        # Only advertise PDF if a suitable engine is installed
-        if cls._find_pdf_engine() is None:
-            formats.discard('pdf')
         return formats
 
     def _get_pandoc_format(self, fmt: str) -> str:
@@ -228,14 +187,7 @@ class PyPandocConverter(ConverterInterface):
             # Extra args for specific output formats
             extra_args = []
             if self.output_type.lower() == 'pdf':
-                engine = self._find_pdf_engine()
-                if engine is None:
-                    raise RuntimeError(
-                        "PDF conversion requires a PDF engine (e.g. pdflatex, xelatex, "
-                        "lualatex, tectonic, wkhtmltopdf, or weasyprint) but none was "
-                        "found on PATH."
-                    )
-                extra_args.append(f'--pdf-engine={engine}')
+                extra_args.append(f'--pdf-engine={self._pdf_engine}')
             if self.output_type.lower() in ('html', 'revealjs', 'slidy', 's5', 'dzslides'):
                 extra_args.append('--standalone')
 
