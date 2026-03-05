@@ -397,11 +397,30 @@ function Converter() {
         {/* Pending conversions section */}
         {hasPendingFiles && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-text mb-4">
-              Pending Conversions ({pendingFiles.length})
-            </h2>
-            <div className="mb-4">
-              <FileTable
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-text">
+                Pending Conversions ({pendingFiles.length})
+              </h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleConvertAll}
+                  disabled={converting || pendingFiles.length === 0}
+                  className="bg-primary hover:bg-primary-dark text-text font-semibold py-2 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {converting
+                    ? `Converting ${pendingFiles.length} file${pendingFiles.length > 1 ? 's' : ''}...`
+                    : `Convert ${pendingFiles.length} File${pendingFiles.length > 1 ? 's' : ''}`}
+                </button>
+                <button
+                  onClick={() => setPendingFiles([])}
+                  disabled={converting}
+                  className="text-sm text-text-muted hover:text-text border border-surface-dark hover:border-text-muted py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <FileTable
                 rows={pendingFiles.map(pf => ({
                   id: pf.file.id,
                   file: pf.file,
@@ -414,16 +433,6 @@ function Converter() {
                 showDate={false}
                 converting={converting}
               />
-            </div>
-            <button
-              onClick={handleConvertAll}
-              disabled={converting || pendingFiles.length === 0}
-              className="w-full bg-primary hover:bg-primary-dark text-text font-semibold py-3 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {converting
-                ? `Converting ${pendingFiles.length} file${pendingFiles.length > 1 ? 's' : ''}...`
-                : `Convert ${pendingFiles.length} File${pendingFiles.length > 1 ? 's' : ''}`}
-            </button>
           </div>
         )}
 

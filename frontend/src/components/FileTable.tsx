@@ -85,9 +85,12 @@ function FileTable({
       case 'filename':
         cmp = (a.file.original_filename || '').localeCompare(b.file.original_filename || '')
         break
-      case 'type':
-        cmp = (a.file.media_type || '').localeCompare(b.file.media_type || '')
+      case 'type': {
+        const typeA = a.selectedFormat || a.conversion?.media_type || a.file.media_type || ''
+        const typeB = b.selectedFormat || b.conversion?.media_type || b.file.media_type || ''
+        cmp = typeA.localeCompare(typeB)
         break
+      }
       case 'size':
         cmp = a.file.size_bytes - b.file.size_bytes
         break
