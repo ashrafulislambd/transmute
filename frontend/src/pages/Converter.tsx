@@ -54,7 +54,7 @@ function Converter() {
         const sortedFormats = file.compatible_formats
           ? [...file.compatible_formats].sort()
           : []
-        const inputExt = file.extension?.replace(/^\./, '') || ''
+        const inputExt = file.extension?.replace(/^\./, '') || file.media_type || ''
         const normalizedExt = formatAliases[inputExt] || inputExt
         const userDefault = defaultFormats[normalizedExt] || defaultFormats[inputExt]
         const selectedFormat = (userDefault && sortedFormats.includes(userDefault))
@@ -105,7 +105,7 @@ function Converter() {
       const sortedFormats = fileInfo.compatible_formats
         ? [...fileInfo.compatible_formats].sort()
         : []
-      const inputExt = fileInfo.extension?.replace(/^\./, '') || ''
+      const inputExt = fileInfo.extension?.replace(/^\./, '') || fileInfo.media_type || ''
       const normalizedExt = formatAliases[inputExt] || inputExt
       const userDefault = defaultFormats[normalizedExt] || defaultFormats[inputExt]
       const defaultFormat = (userDefault && sortedFormats.includes(userDefault))
