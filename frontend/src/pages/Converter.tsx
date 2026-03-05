@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import FileListItem, { FileInfo, ConversionInfo } from '../components/FileListItem'
+import FileTable, { FileInfo, ConversionInfo } from '../components/FileTable'
 
 interface PendingFile {
   file: FileInfo
@@ -400,24 +400,20 @@ function Converter() {
             <h2 className="text-xl font-semibold text-text mb-4">
               Pending Conversions ({pendingFiles.length})
             </h2>
-            <div className="space-y-3 mb-4">
-              {pendingFiles.map((pf) => (
-                <div key={pf.file.id} className="relative">
-                  {converting && (
-                    <div className="absolute inset-0 bg-surface-dark/50 rounded-lg flex items-center justify-center z-10">
-                      <span className="text-sm text-primary font-medium">Converting...</span>
-                    </div>
-                  )}
-                  <FileListItem
-                    file={pf.file}
-                    selectedFormat={pf.selectedFormat}
-                    onFormatChange={(format) => handleFormatChange(pf.file.id, format)}
-                    onDelete={() => handleDelete(pf.file.id, true)}
-                    isDeleting={deletingId === pf.file.id}
-                    isPending={true}
-                  />
-                </div>
-              ))}
+            <div className="mb-4">
+              <FileTable
+                rows={pendingFiles.map(pf => ({
+                  id: pf.file.id,
+                  file: pf.file,
+                  selectedFormat: pf.selectedFormat,
+                  onFormatChange: (format: string) => handleFormatChange(pf.file.id, format),
+                  onDelete: () => handleDelete(pf.file.id, true),
+                  isDeleting: deletingId === pf.file.id,
+                }))}
+                isPending={true}
+                showDate={false}
+                converting={converting}
+              />
             </div>
             <button
               onClick={handleConvertAll}
@@ -456,21 +452,18 @@ function Converter() {
                 </button>
               </div>
             </div>
-            <div className="space-y-3">
-              {completedConversions.map((cc) => (
-                <FileListItem
-                  key={cc.conversion.id}
-                  file={cc.file}
-                  conversion={cc.conversion}
-                  onDownload={() => handleDownload(cc.conversion)}
-                  onDelete={() => handleDelete(cc.file.id, false)}
-                  isDeleting={deletingId === cc.file.id}
-                  isDownloading={downloadingId === cc.conversion.id}
-                  isPending={false}
-                />
-              ))}
-            </div>
-          </div>
+            <FileTable
+              rows={completedConversions.map(cc => ({
+                id: cc.conversion.id,
+                file: cc.file,
+                conversion: cc.conversion,
+                onDownload: () => handleDownload(cc.conversion),
+                onDelete: () => handleDelete(cc.file.id, false),
+                isDeleting: deletingId === cc.file.id,
+                isDownloading: downloadingId === cc.conversion.id,
+              }))}
+              showDate={false}
+            />          </div>
         )}
       </div>
     </div>

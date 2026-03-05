@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import FileListItem, { FileInfo } from '../components/FileListItem'
+import FileTable, { FileInfo } from '../components/FileTable'
 
 function Files() {
   const [files, setFiles] = useState<FileInfo[]>([])
@@ -142,30 +142,19 @@ function Files() {
         )}
 
         {!loading && files.length > 0 && (
-          <>
-            <div className="mb-4 flex justify-start">
-              <button
-                onClick={toggleSelectAll}
-                className="bg-surface-light hover:bg-surface-dark text-text-muted hover:text-text text-sm font-medium py-1.5 px-4 rounded-lg transition duration-200"
-              >
-                {selectedIds.size === files.length ? 'Deselect All' : 'Select All'}
-              </button>
-            </div>
-            <div className="space-y-3">
-              {files.map(file => (
-                <FileListItem
-                  key={file.id}
-                  file={file}
-                  onDelete={() => handleDelete(file.id)}
-                  isDeleting={deletingId === file.id}
-                  isPending={true}
-                  showCheckbox={true}
-                  isSelected={selectedIds.has(file.id)}
-                  onToggleSelect={() => toggleSelection(file.id)}
-                />
-              ))}
-            </div>
-          </>
+          <FileTable
+            rows={files.map(file => ({
+              id: file.id,
+              file,
+              onDelete: () => handleDelete(file.id),
+              isDeleting: deletingId === file.id,
+            }))}
+            isPending={true}
+            showCheckbox={true}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelection}
+            onToggleSelectAll={toggleSelectAll}
+          />
         )}
       </div>
     </div>

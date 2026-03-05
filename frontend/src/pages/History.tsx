@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import FileListItem, { FileInfo, ConversionInfo } from '../components/FileListItem'
+import FileTable, { FileInfo, ConversionInfo } from '../components/FileTable'
 
 interface OriginalFileInfo {
   id: string
@@ -102,10 +102,10 @@ function History() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === sortedConversions.length) {
+    if (selectedIds.size === conversions.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(sortedConversions.map(c => c.id)))
+      setSelectedIds(new Set(conversions.map(c => c.id)))
     }
   }
 
@@ -174,9 +174,6 @@ function History() {
     }
   }
 
-  const sortedConversions = conversions
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-surface-dark to-surface-light p-8">
       <div className="max-w-4xl mx-auto">
@@ -214,23 +211,13 @@ function History() {
           <p className="text-text-muted text-sm">Loading conversions...</p>
         )}
 
-        {!loading && sortedConversions.length === 0 && (
+        {!loading && conversions.length === 0 && (
           <p className="text-text-muted text-sm">No converted files yet.</p>
         )}
 
-        {!loading && sortedConversions.length > 0 && (
-          <>
-            <div className="mb-4 flex justify-start">
-              <button
-                onClick={toggleSelectAll}
-                className="bg-surface-light hover:bg-surface-dark text-text-muted hover:text-text text-sm font-medium py-1.5 px-4 rounded-lg transition duration-200"
-              >
-                {selectedIds.size === sortedConversions.length ? 'Deselect All' : 'Select All'}
-              </button>
-            </div>
-            <div className="space-y-3">
-              {sortedConversions.map(conversion => {
-              // Use original file metadata if available, otherwise use conversion metadata
+        {!loading && conversions.length > 0 && (
+          <FileTable
+            rows={conversions.map(conversion => {
               const originalFile = conversion.original_file
               const fileInfo: FileInfo = {
                 id: originalFile?.id || conversion.id,
@@ -248,24 +235,21 @@ function History() {
                 size_bytes: conversion.size_bytes,
                 created_at: conversion.created_at,
               }
-              return (
-                <FileListItem
-                  key={conversion.id}
-                  file={fileInfo}
-                  conversion={conversionInfo}
-                  onDownload={() => handleDownload(conversion)}
-                  onDelete={() => handleDelete(conversion.id)}
-                  isDeleting={deletingId === conversion.id}
-                  isDownloading={downloadingId === conversion.id}
-                  isPending={false}
-                  showCheckbox={true}
-                  isSelected={selectedIds.has(conversion.id)}
-                  onToggleSelect={() => toggleSelection(conversion.id)}
-                />
-              )
+              return {
+                id: conversion.id,
+                file: fileInfo,
+                conversion: conversionInfo,
+                onDownload: () => handleDownload(conversion),
+                onDelete: () => handleDelete(conversion.id),
+                isDeleting: deletingId === conversion.id,
+                isDownloading: downloadingId === conversion.id,
+              }
             })}
-            </div>
-          </>
+            showCheckbox={true}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelection}
+            onToggleSelectAll={toggleSelectAll}
+          />
         )}
       </div>
     </div>
