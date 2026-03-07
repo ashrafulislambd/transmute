@@ -23,6 +23,14 @@ This application is under active development. Want to support us? Give us a star
 > **This project is human-led and maintainer-reviewed.**
 > AI tools may be used during development, but all code is intentionally written, reviewed, and validated by a human who understands and takes responsibility for the result. This is not an autonomously generated project, and fully AI-generated or agent-submitted contributions are not accepted. See the [contributing guide](https://github.com/transmute-app/transmute?tab=contributing-ov-file#no-autonomous-agents-or-ai-assistants) for more details
 
+## Screenshots
+| Converter / Home | Uploaded Files | Previously Converted | Settings |
+| --- | --- | --- | --- |
+| <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/converter.png" width=100%> | <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/files.png" width=100%> | <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/history.png" width=100%> | <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/settings.png" width=100%> |
+
+## Demo
+Want to see a video demo? Check out our [YouTube](https://www.youtube.com/watch?v=lod7Fze9oPY).
+
 ## Features
 
 - **Privacy first**: Files are processed on your own server and never sent to third parties
@@ -31,11 +39,6 @@ This application is under active development. Want to support us? Give us a star
 - **Docker ready**: Deploy with a single command, no complex setup required
 - **REST API**: Automate and integrate file conversions via the built-in OpenAPI-documented API
 - **Multiple themes**: Seven built-in light and dark UI themes
-
-## Screenshots
-| Converter / Home | Uploaded Files | Previously Converted | Settings |
-| --- | --- | --- | --- |
-| <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/converter.png" width=100%> | <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/files.png" width=100%> | <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/history.png" width=100%> | <img src="https://raw.githubusercontent.com/transmute-app/transmute/refs/heads/main/assets/screenshots/settings.png" width=100%> |
 
 <!-- PRE_GIF_MARKER 
 <div align="center">
