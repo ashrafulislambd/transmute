@@ -11,6 +11,10 @@ on:
           - patch
           - minor
           - major
+      overview_note:
+        description: 'Overview note for the release'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -30,3 +34,20 @@ jobs:
         uses: chase-roohms/tag-and-release@v1
         with:
           version_bump: ${{ github.event.inputs.bump_type }}
+          update_parent_tags: true
+          overview_note: ${{ github.event.inputs.overview_note }}
+  
+  docker-publish:
+    needs: bump-version
+    uses: ./.github/workflows/docker-publish.yml
+    with:
+      version_tag: ${{ needs.bump-version.outputs.new_version }}
+    secrets: 
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PUBLIC_RO_TOKEN: ${{ secrets.DOCKER_PUBLIC_RO_TOKEN }}
+      DOCKER_PUBLIC_RW_TOKEN: ${{ secrets.DOCKER_PUBLIC_RW_TOKEN }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
