@@ -144,13 +144,13 @@ def test_sanitize_filename_unnamed():
     assert sanitize_filename("") == "unnamed"
 
 def test_delete_file_and_metadata_not_found_http_exception(safe_path_test_settings, tmp_db):
-    file: Path = safe_path_test_settings.upload_dir / "hello.txt"
+    file: Path = safe_path_test_settings.upload_dir / "hello4.txt"
     with pytest.raises(HTTPException):
-        delete_file_and_metadata("hello", tmp_db)
+        delete_file_and_metadata("hello4", tmp_db)
 
 def test_delete_file_and_metadata_not_found(safe_path_test_settings, tmp_db):
-    file: Path = safe_path_test_settings.upload_dir / "hello.txt"
-    assert delete_file_and_metadata("hello", tmp_db, raise_if_not_found=False) is None
+    file: Path = safe_path_test_settings.upload_dir / "hello3.txt"
+    assert delete_file_and_metadata("hello3", tmp_db, raise_if_not_found=False) is None
 
 def test_delete_file_and_meta_file_deleted(safe_path_test_settings, tmp_db):
     file: Path = safe_path_test_settings.upload_dir / "abc123.txt"
@@ -163,6 +163,7 @@ def test_delete_file_and_meta_file_deleted(safe_path_test_settings, tmp_db):
         "extension": ".txt",
         "size_bytes": 1024,
         "sha256_checksum": "dummy_checksum",
+        "user_id": "dummy_user_1",
     })
     delete_file_and_metadata("abc123", tmp_db)
     assert file.exists() == False
@@ -178,6 +179,7 @@ def test_delete_file_and_meta_file_must_follow_uuid(safe_path_test_settings, tmp
         "extension": ".txt",
         "size_bytes": 1024,
         "sha256_checksum": "dummy_checksum",
+        "user_id": "dummy_user_2",
     })
     with pytest.raises(HTTPException):
         delete_file_and_metadata("hello", tmp_db)
