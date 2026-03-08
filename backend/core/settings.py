@@ -48,10 +48,6 @@ class Settings(BaseSettings):
     auth_algorithm: str = "HS256"
     auth_access_token_expire_minutes: int = 60
 
-    # ===== Redis =====
-
-    redis_url: str = "redis://redis:6379/0"
-
     # ===== Server =====
 
     api_display_host: str = "YOUR_TRANSMUTE_IP"
