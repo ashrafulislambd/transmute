@@ -22,6 +22,21 @@ CONVERTED_DIR = settings.output_dir
 TMP_DIR = settings.tmp_dir
 
 
+def build_zip_entry_name(file_metadata: dict, is_converted_file: bool) -> str:
+    """Build a safe ZIP entry name, preserving converted output extensions."""
+    original_name = file_metadata.get("original_filename") or "download"
+
+    if not is_converted_file:
+        return sanitize_filename(original_name)
+
+    output_extension = sanitize_extension(
+        file_metadata.get("extension") or Path(file_metadata.get("storage_path", "")).suffix
+    )
+    base_name = Path(original_name).stem or original_name
+    converted_name = f"{base_name}.{output_extension}" if output_extension else base_name
+    return sanitize_filename(converted_name)
+
+
 async def save_file(file: UploadFile, db: FileDB, user_id: str) -> dict:
     """Save an uploaded file to disk and store its metadata in the database."""
     uuid_str = str(uuid.uuid4())
@@ -148,7 +163,7 @@ def get_file(
             mime_type = mimetypes.guess_type(f"file.{ext}")[0] or "application/octet-stream"
             return FileResponse(
                 path=file_path,
-                filename=metadata['original_filename'],
+                filename=build_zip_entry_name(metadata, db is conv_db),
                 media_type=mime_type
             )
     raise HTTPException(status_code=404, detail="File not found")
@@ -185,6 +200,7 @@ def batch_download_files(
     with ZipFile(zip_path, "w") as zip_file:
         for file_id in request.file_ids:
             found_file_in_db = False
+            is_converted_file = False
             # Check both original and converted file databases for the file ID
             for db in [file_db, conv_db]:
                 file_metadata = db.get_file_metadata(file_id)
@@ -194,6 +210,7 @@ def batch_download_files(
                         file_metadata = None
                         continue
                     found_file_in_db = True
+                    is_converted_file = db is conv_db
                     break
             
             if not found_file_in_db:
@@ -212,8 +229,7 @@ def batch_download_files(
                     os.unlink(zip_path)
                 raise HTTPException(status_code=404, detail=f"File with id {file_id} not found on disk")
             
-            # Use sanitized original filename for the ZIP entry
-            arcname = sanitize_filename(file_metadata['original_filename'])
+            arcname = build_zip_entry_name(file_metadata, is_converted_file)
             # Deduplicate names when multiple files share the same original filename
             if arcname in seen_names:
                 seen_names[arcname] += 1
