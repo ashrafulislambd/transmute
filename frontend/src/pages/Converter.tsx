@@ -380,7 +380,7 @@ function Converter() {
 
   const keydownHandler = (event: KeyboardEvent) => {
       let shortcut = '';
-      if(event.ctrlKey) shortcut += 'CTRL+'
+      if(event.ctrlKey || event.metaKey) shortcut += 'CTRL+'
       if(event.shiftKey) shortcut += 'SHIFT+'
       if(event.altKey) shortcut += 'ALT+'
       shortcut += event.key.toUpperCase()
