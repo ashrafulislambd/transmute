@@ -165,7 +165,11 @@ class PandasConverter(ConverterInterface):
             conn = sqlite3.connect(self.input_file)
             tables = pd.read_sql("SELECT name FROM sqlite_master WHERE type='table'", conn)
             table_name = tables['name'].iloc[0]
-            df = pd.read_sql(f'SELECT * FROM "{table_name}"', conn)
+            # The table name comes from the file's own metadata so it's not 
+            # exactly untrusted input, but we should still sanitize it properly.
+            safe_name = table_name.replace('"', '""')
+            # nosec B608 - table name is sanitized and comes from the database itself, not user input
+            df = pd.read_sql(f'SELECT * FROM "{safe_name}"', conn)  # nosec B608
             conn.close()
         elif self.input_type == 'dta':
             df = pd.read_stata(self.input_file)
