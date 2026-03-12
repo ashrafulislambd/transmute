@@ -58,9 +58,10 @@ RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     rm /tmp/drawio.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Security patches: upgrade vulnerable packages to patched versions
+# Security patches: upgrade vulnerable packages to patched versions, remove vulnerable packages that are not needed
 RUN apt-get update && \
-    apt-get install -y --only-upgrade libnss3 imagemagick && \
+  apt-get install -y --only-upgrade libnss3 && \
+  apt-get purge -y imagemagick imagemagick-7-common libmagickcore-7.q16-10 libmagickcore-7.q16-10-extra libmagickwand-7.q16-10 && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy backend code
