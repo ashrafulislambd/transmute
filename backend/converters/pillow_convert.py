@@ -193,6 +193,11 @@ class PillowConverter(ConverterInterface):
             else:
                 # Open the image
                 img = Image.open(self.input_file)
+
+            # PSD files can expose broken sequence state to some encoders
+            # (notably AVIF). Saving a detached raster copy avoids frame seeks.
+            if input_fmt == 'psd':
+                img = img.copy()
             
             # Handle transparency for formats that don't support alpha
             output_fmt = self.output_type.lower()
