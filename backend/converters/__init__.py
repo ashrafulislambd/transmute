@@ -7,6 +7,7 @@ from .pymupdf_convert import PyMuPDFConverter
 from .pysubs2_convert import PySubs2Converter
 from .fonttools_convert import FonttoolsConverter
 from .libreoffice_convert import LibreOfficeConverter
+from .email_convert import EmailConverter
 from .converter_interface import ConverterInterface
 
-__all__ = ["FFmpegConverter", "PillowConverter", "PandasConverter", "DrawioConverter", "PyPandocConverter", "PyMuPDFConverter", "PySubs2Converter", "FonttoolsConverter", "LibreOfficeConverter", "ConverterInterface"]
+__all__ = ["FFmpegConverter", "PillowConverter", "PandasConverter", "DrawioConverter", "PyPandocConverter", "PyMuPDFConverter", "PySubs2Converter", "FonttoolsConverter", "LibreOfficeConverter", "EmailConverter", "ConverterInterface"]
