@@ -3,15 +3,18 @@ import os
 import logging
 import shutil
 import tarfile
+import tempfile
 import rarfile
 import zipfile
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 
+import py7zr
 import pyzstd
 
+from core.settings import get_settings
 from .converter_interface import ConverterInterface
 
 
@@ -23,6 +26,7 @@ class ArchiveConverter(ConverterInterface):
     """
 
     supported_input_formats: set = {
+        '7z',
         'zip',
         'tar',
         'rar',
@@ -32,6 +36,7 @@ class ArchiveConverter(ConverterInterface):
         'tar.zst',
     }
     supported_output_formats: set = {
+        '7z',
         'zip',
         'tar',
         'tar.gz',
@@ -168,11 +173,19 @@ class ArchiveConverter(ConverterInterface):
         with rarf.open(member.filename, 'r') as source:
             tar.addfile(tarinfo, fileobj=source)
 
+    # ZIP format minimum timestamp (1980-01-01 00:00:00)
+    _ZIP_MIN_DATE_TIME = (1980, 1, 1, 0, 0, 0)
+
     def _add_tar_member_to_zip(self, tar: tarfile.TarFile, member: tarfile.TarInfo, zipf: zipfile.ZipFile) -> None:
         """Stream a TAR entry into a ZIP archive without loading the full member into memory."""
+        mtime = member.mtime or 0
+        date_time = datetime.fromtimestamp(mtime, tz=timezone.utc).timetuple()[:6]
+        if date_time < self._ZIP_MIN_DATE_TIME:
+            date_time = self._ZIP_MIN_DATE_TIME
+
         zipinfo = zipfile.ZipInfo(
             filename=member.name if not member.isdir() else f"{member.name.rstrip('/')}/",
-            date_time=datetime.utcfromtimestamp(member.mtime or 0).timetuple()[:6],
+            date_time=date_time,
         )
         zipinfo.external_attr = (member.mode & 0xFFFF) << 16
 
@@ -277,6 +290,68 @@ class ArchiveConverter(ConverterInterface):
                     file_data = rarf.read(member.filename)
                     zipf.writestr(member.filename, file_data)
         return output_file
+
+    def convert_7z_to_zip(self, output_file: str) -> str:
+        """Convert a 7z archive to ZIP format."""
+        with tempfile.TemporaryDirectory(dir=get_settings().tmp_dir) as tmp:
+            with py7zr.SevenZipFile(self.input_file, 'r') as sz:
+                sz.extractall(path=tmp)
+            with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, _dirs, files in os.walk(tmp):
+                    for fname in files:
+                        full = os.path.join(root, fname)
+                        arcname = os.path.relpath(full, tmp)
+                        zipf.write(full, arcname)
+        return output_file
+
+    def convert_7z_to_tar(self, output_file: str, compression_type: str = '') -> str:
+        """Convert a 7z archive to TAR format with optional compression."""
+        if compression_type not in ('', 'gz', 'bz2', 'xz', 'zst'):
+            raise ValueError(f"Unsupported compression type for TAR output: {compression_type}")
+        with tempfile.TemporaryDirectory(dir=get_settings().tmp_dir) as tmp:
+            with py7zr.SevenZipFile(self.input_file, 'r') as sz:
+                sz.extractall(path=tmp)
+            with self._open_tar_for_writing(output_file, compression_type) as tar:
+                for root, _dirs, files in os.walk(tmp):
+                    for fname in files:
+                        full = os.path.join(root, fname)
+                        arcname = os.path.relpath(full, tmp)
+                        tar.add(full, arcname=arcname)
+        return output_file
+
+    def convert_zip_to_7z(self, output_file: str) -> str:
+        """Convert a ZIP archive to 7z format."""
+        with zipfile.ZipFile(self.input_file, 'r') as zipf:
+            with py7zr.SevenZipFile(output_file, 'w') as sz:
+                for member in zipf.infolist():
+                    if member.is_dir():
+                        continue
+                    with zipf.open(member, 'r') as source:
+                        sz.writef(source, member.filename)
+        return output_file
+
+    def convert_tar_to_7z(self, output_file: str) -> str:
+        """Convert a TAR archive to 7z format."""
+        with self._open_tar_for_reading() as tar:
+            with py7zr.SevenZipFile(output_file, 'w') as sz:
+                for member in self._iter_tar_members(tar):
+                    if member.isdir():
+                        continue
+                    source = tar.extractfile(member)
+                    if source is not None:
+                        sz.writef(source, member.name)
+        return output_file
+
+    def convert_rar_to_7z(self, output_file: str) -> str:
+        """Convert a RAR archive to 7z format."""
+        with rarfile.RarFile(self.input_file, 'r') as rarf:
+            with py7zr.SevenZipFile(output_file, 'w') as sz:
+                for member in rarf.infolist():
+                    if member.isdir():
+                        continue
+                    data = rarf.read(member.filename)
+                    sz.writef(io.BytesIO(data), member.filename)
+        return output_file
     
     def convert(self, overwrite: bool = True, quality: Optional[str] = None) -> list[str]:
         """
@@ -330,6 +405,23 @@ class ArchiveConverter(ConverterInterface):
         
         elif self.input_type.lower() == "rar" and self.output_type.lower() == "zip":
             return [self.convert_rar_to_zip(output_file)]
+
+        elif self.input_type.lower() == "rar" and self.output_type.lower() == "7z":
+            return [self.convert_rar_to_7z(output_file)]
+
+        elif self.input_type.lower() == "7z" and self.output_type.lower() == "zip":
+            return [self.convert_7z_to_zip(output_file)]
+
+        elif self.input_type.lower() == "7z" and self.output_type.lower().startswith("tar"):
+            compression = self.output_type.lower().removeprefix("tar").lstrip('.')
+            compression = compression if compression else ''
+            return [self.convert_7z_to_tar(output_file, compression)]
+
+        elif self.input_type.lower() == "zip" and self.output_type.lower() == "7z":
+            return [self.convert_zip_to_7z(output_file)]
+
+        elif self.input_type.lower().startswith("tar") and self.output_type.lower() == "7z":
+            return [self.convert_tar_to_7z(output_file)]
 
         logging.error("Archive conversion is not yet implemented.")
         raise NotImplementedError("Archive conversion is not yet implemented.")
