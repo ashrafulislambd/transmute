@@ -39,6 +39,7 @@ RUN apt-get update && apt-get install -y \
     libcairo2 \
     librsvg2-bin \
     tar \
+    unrar \
     libreoffice-impress \
     libreoffice-common \
     && rm -rf /var/lib/apt/lists/*

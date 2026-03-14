@@ -27,6 +27,7 @@ python-magic==0.4.27
 python-multipart==0.0.22
 python-pptx==1.0.2
 pyyaml==6.0.3
+rarfile==4.2.0
 tomli_w==1.2.0
 toons==0.5.3   # See https://github.com/alesanfra/toons/issues/10
 uvicorn==0.41.0
