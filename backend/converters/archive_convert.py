@@ -25,6 +25,8 @@ class ArchiveConverter(ConverterInterface):
     Converter for repacking between archive formats like ZIP and TAR.GZ.
     """
 
+    _7Z_WRITE_FILTERS = [{"id": py7zr.FILTER_LZMA2, "preset": 1}]
+
     supported_input_formats: set = {
         '7z',
         'zip',
@@ -300,6 +302,15 @@ class ArchiveConverter(ConverterInterface):
         # If we get here, all members are safe to extract
         sz.extractall(path=dest)  # nosec B202
 
+    def _safe_extract_tar(self, tar: tarfile.TarFile, dest: str) -> None:
+        """Extract a tar archive with path traversal and symlink protection.
+
+        Uses Python 3.12+ ``filter='data'`` which strips ``../``, leading ``/``,
+        rejects symlinks/hardlinks that escape the destination, and only permits
+        regular files and directories.
+        """ 
+        tar.extractall(path=dest, filter='data')  # nosec B202
+
     def convert_7z_to_zip(self, output_file: str) -> str:
         """Convert a 7z archive to ZIP format."""
         with tempfile.TemporaryDirectory(dir=get_settings().tmp_dir) as tmp:
@@ -331,7 +342,7 @@ class ArchiveConverter(ConverterInterface):
     def convert_zip_to_7z(self, output_file: str) -> str:
         """Convert a ZIP archive to 7z format."""
         with zipfile.ZipFile(self.input_file, 'r') as zipf:
-            with py7zr.SevenZipFile(output_file, 'w') as sz:
+            with py7zr.SevenZipFile(output_file, 'w', filters=self._7Z_WRITE_FILTERS) as sz:
                 for member in zipf.infolist():
                     if member.is_dir():
                         continue
@@ -341,20 +352,21 @@ class ArchiveConverter(ConverterInterface):
 
     def convert_tar_to_7z(self, output_file: str) -> str:
         """Convert a TAR archive to 7z format."""
-        with self._open_tar_for_reading() as tar:
-            with py7zr.SevenZipFile(output_file, 'w') as sz:
-                for member in self._iter_tar_members(tar):
-                    if member.isdir():
-                        continue
-                    source = tar.extractfile(member)
-                    if source is not None:
-                        sz.writef(io.BytesIO(source.read()), member.name)
+        with tempfile.TemporaryDirectory(dir=get_settings().tmp_dir) as tmp:
+            with self._open_tar_for_reading() as tar:
+                self._safe_extract_tar(tar, tmp)
+            with py7zr.SevenZipFile(output_file, 'w', filters=self._7Z_WRITE_FILTERS) as sz:
+                for root, _dirs, files in os.walk(tmp):
+                    for fname in files:
+                        full = os.path.join(root, fname)
+                        arcname = os.path.relpath(full, tmp)
+                        sz.write(full, arcname)
         return output_file
 
     def convert_rar_to_7z(self, output_file: str) -> str:
         """Convert a RAR archive to 7z format."""
         with rarfile.RarFile(self.input_file, 'r') as rarf:
-            with py7zr.SevenZipFile(output_file, 'w') as sz:
+            with py7zr.SevenZipFile(output_file, 'w', filters=self._7Z_WRITE_FILTERS) as sz:
                 for member in rarf.infolist():
                     if member.isdir():
                         continue
