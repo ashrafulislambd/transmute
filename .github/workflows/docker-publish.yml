@@ -10,8 +10,6 @@ on:
     secrets:
       DOCKER_USERNAME:
         required: true
-      DOCKER_PUBLIC_RO_TOKEN:
-        required: true
       DOCKER_PUBLIC_RW_TOKEN:
         required: true
   push:
@@ -94,7 +92,7 @@ jobs:
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PUBLIC_RO_TOKEN }}
+          password: ${{ secrets.DOCKER_PUBLIC_RW_TOKEN }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9  # v3.7.0
