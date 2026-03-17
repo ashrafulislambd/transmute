@@ -32,6 +32,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ffmpeg \
+    ghostscript \
     libsm6 \
     libxext6 \
     libopengl0 \

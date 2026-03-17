@@ -2,6 +2,15 @@
 
 media_type_aliases = {
     'jpg': 'jpeg',
+    'jfif': 'jpeg',
+    'jpe': 'jpeg',
+    'j2k': 'jp2',
+    'j2c': 'jp2',
+    'jpc': 'jp2',
+    'jpx': 'jp2',
+    'jpf': 'jp2',
+    'jpeg2000': 'jp2',
+    'ps': 'eps',
     'yml': 'yaml',
     'ndjson': 'jsonl',
     'alac': 'm4a',

@@ -22,6 +22,9 @@ try:
 except (ImportError, OSError):
     _CAIROSVG_AVAILABLE = False
 
+import shutil
+_GHOSTSCRIPT_AVAILABLE = shutil.which('gs') is not None or shutil.which('gswin32c') is not None
+
 
 class PillowConverter(ConverterInterface):
     supported_input_formats: set = {
@@ -58,6 +61,11 @@ class PillowConverter(ConverterInterface):
         'dib',
         'avif',
         'jxl',
+        'eps',
+        'apng',
+        'mpo',
+        'pnm',
+        'pfm',
     }
     supported_output_formats: set = {
         'jpeg',
@@ -90,6 +98,11 @@ class PillowConverter(ConverterInterface):
         'dib',
         'avif',
         'jxl',
+        'eps',
+        'apng',
+        'mpo',
+        'pnm',
+        'pfm',
     }
     def __init__(self, input_file: str, output_dir: str, input_type: str, output_type: str):
         """
@@ -140,6 +153,12 @@ class PillowConverter(ConverterInterface):
         # SVG input requires cairosvg
         if format_type.lower() == 'svg' and not _CAIROSVG_AVAILABLE:
             return set()
+        # EPS input requires Ghostscript
+        if format_type.lower() == 'eps' and not _GHOSTSCRIPT_AVAILABLE:
+            return set()
+        # EPS output requires Ghostscript (for reading back)
+        if not _GHOSTSCRIPT_AVAILABLE:
+            base_formats.discard('eps')
         return base_formats
 
     
@@ -190,6 +209,13 @@ class PillowConverter(ConverterInterface):
                 # Convert SVG to PNG with transparency using cairosvg
                 png_data = cairosvg.svg2png(url=self.input_file)
                 img = Image.open(BytesIO(png_data))
+            elif input_fmt == 'eps':
+                if not _GHOSTSCRIPT_AVAILABLE:
+                    raise RuntimeError(
+                        "Ghostscript is required for EPS conversion but could not be found. "
+                        "Install Ghostscript (e.g. `brew install ghostscript` or `apt-get install ghostscript`)."
+                    )
+                img = Image.open(self.input_file)
             else:
                 # Open the image
                 img = Image.open(self.input_file)
@@ -207,7 +233,8 @@ class PillowConverter(ConverterInterface):
                 img = img.convert('P')
 
             _no_alpha_formats = {'jpg', 'jpeg', 'pdf', 'sgi', 'bmp', 'ppm', 'pcx', 'gif', 'tga',
-                                    'dib', 'msp', 'xbm', 'fli', 'flc', 'dcx'}
+                                    'dib', 'msp', 'xbm', 'fli', 'flc', 'dcx', 'eps', 'mpo',
+                                    'pnm', 'pfm'}
             if output_fmt in _no_alpha_formats and img.mode in ['RGBA', 'LA', 'P']:
                 if img.mode == 'P':
                     img = img.convert('RGBA')

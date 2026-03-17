@@ -21,6 +21,7 @@ class FFmpegConverter(ConverterInterface):
         'mpeg',
         'm4v',
         'gif',
+        'apng',
         'ts',
         '3gp',
         'ogv',
