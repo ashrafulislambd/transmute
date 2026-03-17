@@ -223,9 +223,15 @@ class PillowConverter(ConverterInterface):
             # Handle transparency for formats that don't support alpha
             output_fmt = self.output_type.lower()
 
-            # BLP only supports P (palette) mode
-            if output_fmt == 'blp' and img.mode != 'P':
-                img = img.convert('P')
+            # BLP is a game texture format — its encoder is extremely slow on
+            # large images.  Cap at 512×512 (typical max texture size) and
+            # convert to palette mode which BLP requires.
+            if output_fmt == 'blp':
+                max_blp = 512
+                if img.width > max_blp or img.height > max_blp:
+                    img.thumbnail((max_blp, max_blp), Image.LANCZOS)
+                if img.mode != 'P':
+                    img = img.quantize(colors=256, method=Image.Quantize.FASTOCTREE)
 
             _no_alpha_formats = {'jpg', 'jpeg', 'pdf', 'sgi', 'bmp', 'ppm', 'pcx', 'gif', 'tga',
                                     'dib', 'msp', 'xbm', 'fli', 'flc', 'dcx', 'eps', 'mpo',
