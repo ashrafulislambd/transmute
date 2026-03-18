@@ -1,10 +1,15 @@
+import base64
+import binascii
 import os
 import re
+import shutil
 import tempfile
+import xml.etree.ElementTree as ET
 import pypandoc
 from pathlib import Path
 from typing import Optional
 
+from core.settings import get_settings
 from .converter_interface import ConverterInterface
 
 
@@ -182,9 +187,9 @@ class PyPandocConverter(ConverterInterface):
         """
         return self._pandoc_output_format_map.get(fmt.lower(), fmt.lower())
 
-    def _build_extra_args(self) -> list[str]:
+    def _build_extra_args(self, conversion_input_file: str) -> list[str]:
         extra_args: list[str] = []
-        input_dir = str(Path(self.input_file).resolve().parent)
+        input_dir = str(Path(conversion_input_file).resolve().parent)
 
         # Resolve relative resources such as linked images from the source file's directory.
         extra_args.append(f'--resource-path={input_dir}')
@@ -203,6 +208,9 @@ class PyPandocConverter(ConverterInterface):
             extra_args.append('--standalone')
 
         return extra_args
+
+    def _get_temp_dir(self) -> str:
+        return str(get_settings().tmp_dir)
 
     def _is_remote_resource(self, target: str) -> bool:
         return target.startswith(('http://', 'https://'))
@@ -262,12 +270,76 @@ class PyPandocConverter(ConverterInterface):
         content = re.sub(r'\[\[URL:(https?://[^\]]+\.(?:png|jpe?g|gif|svg))\]\]', '', content, flags=re.IGNORECASE)
         return content
 
-    def _prepare_input_file(self) -> tuple[str, Optional[str]]:
+    def _sanitize_fb2_binary_name(self, binary_id: str, used_names: set[str]) -> str:
+        candidate = Path(binary_id.replace('\x00', '')).name
+        candidate = re.sub(r'[^A-Za-z0-9._-]+', '_', candidate).strip('._')
+        if not candidate:
+            candidate = 'binary'
+
+        stem, suffix = os.path.splitext(candidate)
+        safe_name = candidate
+        counter = 1
+        while safe_name in used_names:
+            safe_name = f'{stem}_{counter}{suffix}'
+            counter += 1
+
+        used_names.add(safe_name)
+        return safe_name
+
+    def _prepare_fb2_input(self, input_path: Path) -> tuple[str, list[str]]:
+        temp_dir = tempfile.mkdtemp(prefix='transmute-fb2-', dir=self._get_temp_dir())
+        temp_input_path = Path(temp_dir) / input_path.name
+        shutil.copy2(input_path, temp_input_path)
+
+        tree = ET.parse(temp_input_path)
+        root = tree.getroot()
+        namespace = {
+            'fb2': 'http://www.gribuser.ru/xml/fictionbook/2.0',
+            'xlink': 'http://www.w3.org/1999/xlink',
+        }
+        xlink_href = '{http://www.w3.org/1999/xlink}href'
+        binary_name_map: dict[str, str] = {}
+        used_names: set[str] = set()
+
+        for binary in root.findall('fb2:binary', namespace):
+            binary_id = binary.attrib.get('id')
+            if not binary_id or not binary.text:
+                continue
+
+            safe_binary_name = self._sanitize_fb2_binary_name(binary_id, used_names)
+            binary_name_map[binary_id] = safe_binary_name
+            binary.set('id', safe_binary_name)
+
+            binary_path = Path(temp_dir) / safe_binary_name
+            try:
+                binary_payload = ''.join(binary.text.split())
+                binary_path.write_bytes(base64.b64decode(binary_payload, validate=True))
+            except (ValueError, binascii.Error):
+                continue
+
+        for image in root.findall('.//fb2:image', namespace):
+            href = image.attrib.get(xlink_href)
+            if not href or not href.startswith('#'):
+                continue
+
+            binary_id = href[1:]
+            safe_binary_name = binary_name_map.get(binary_id)
+            if safe_binary_name:
+                image.set(xlink_href, f'#{safe_binary_name}')
+
+        tree.write(temp_input_path, encoding='utf-8', xml_declaration=True)
+
+        return str(temp_input_path), [temp_dir]
+
+    def _prepare_input_file(self) -> tuple[str, list[str]]:
         input_path = Path(self.input_file).resolve()
         input_dir = input_path.parent
 
+        if self.input_type.lower() == 'fb2':
+            return self._prepare_fb2_input(input_path)
+
         if self.input_type.lower() not in {'rst', 'org', 'muse'}:
-            return self.input_file, None
+            return self.input_file, []
 
         with open(input_path, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -280,18 +352,19 @@ class PyPandocConverter(ConverterInterface):
             sanitized = self._sanitize_muse_content(content, input_dir)
 
         if sanitized == content:
-            return self.input_file, None
+            return self.input_file, []
 
         temp_file = tempfile.NamedTemporaryFile(
             mode='w',
             encoding='utf-8',
             suffix=input_path.suffix,
+            dir=self._get_temp_dir(),
             delete=False,
         )
         with temp_file:
             temp_file.write(sanitized)
 
-        return temp_file.name, temp_file.name
+        return temp_file.name, [temp_file.name]
 
     def convert(self, overwrite: bool = True, quality: Optional[str] = None) -> list[str]:
         """
@@ -327,13 +400,13 @@ class PyPandocConverter(ConverterInterface):
         if not overwrite and os.path.exists(output_file):
             return [output_file]
 
-        temp_input_file = None
+        cleanup_paths: list[str] = []
 
         try:
             input_pandoc_fmt = self._get_pandoc_input_format(self.input_type)
             output_pandoc_fmt = self._get_pandoc_output_format(self.output_type)
-            extra_args = self._build_extra_args()
-            conversion_input_file, temp_input_file = self._prepare_input_file()
+            conversion_input_file, cleanup_paths = self._prepare_input_file()
+            extra_args = self._build_extra_args(conversion_input_file)
 
             pypandoc.convert_file(
                 conversion_input_file,
@@ -355,5 +428,8 @@ class PyPandocConverter(ConverterInterface):
         except Exception as e:
             raise RuntimeError(f"Document conversion failed: {str(e)}")
         finally:
-            if temp_input_file and os.path.exists(temp_input_file):
-                os.unlink(temp_input_file)
+            for cleanup_path in cleanup_paths:
+                if os.path.isdir(cleanup_path):
+                    shutil.rmtree(cleanup_path, ignore_errors=True)
+                elif os.path.exists(cleanup_path):
+                    os.unlink(cleanup_path)
