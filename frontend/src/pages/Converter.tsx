@@ -18,6 +18,23 @@ interface CompletedConversion {
   conversion: ConversionInfo
 }
 
+function getIsMacPlatform() {
+  if (typeof navigator === 'undefined') return false
+
+  const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform
+    || navigator.platform
+    || navigator.userAgent
+  return /mac|iphone|ipad|ipod/i.test(platform)
+}
+
+function HotkeyHint({ label, className = '' }: { label: string; className?: string }) {
+  return (
+    <span className={`text-[11px] tracking-[0.12em] ${className || 'text-text-muted/70'}`}>
+      {label}
+    </span>
+  )
+}
+
 function Converter() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -342,7 +359,14 @@ function Converter() {
 
   const filePickerRef1 = useRef<HTMLInputElement>(null)
   const filePickerRef2 = useRef<HTMLInputElement>(null)
-  const handleConvertAllRef = useRef(handleConvertAll);
+  const handleConvertAllRef = useRef(handleConvertAll)
+  const isMacPlatform = getIsMacPlatform()
+
+  const hotkeyLabels = {
+    open: isMacPlatform ? '⌘O' : 'Ctrl+O',
+    convert: isMacPlatform ? '⌘↵' : 'Ctrl+Enter',
+    clear: 'Esc',
+  }
 
   const hotkeys : Record<string, Function> = {
     'CTRL+O': () => {
@@ -363,13 +387,11 @@ function Converter() {
   }
 
   const keydownHandler = (event: KeyboardEvent) => {
-      let shortcut = '';
+      let shortcut = ''
       if(event.ctrlKey || event.metaKey) shortcut += 'CTRL+'
       if(event.shiftKey) shortcut += 'SHIFT+'
       if(event.altKey) shortcut += 'ALT+'
       shortcut += event.key.toUpperCase()
-
-      console.log(shortcut);
 
       if(hotkeys[shortcut]) {
         event.preventDefault()
@@ -378,7 +400,11 @@ function Converter() {
   }
 
   useEffect(() => {
-    window.addEventListener('keydown', keydownHandler);
+    window.addEventListener('keydown', keydownHandler)
+
+    return () => {
+      window.removeEventListener('keydown', keydownHandler)
+    }
   }, [])
 
   useEffect(() => {
@@ -416,6 +442,7 @@ function Converter() {
                   {uploading ? `Uploading ${uploadCount} file${uploadCount > 1 ? 's' : ''}...` : 'Drop files here'}
                 </span>
                 <span className="text-xs opacity-60">or click to browse</span>
+                <HotkeyHint label={hotkeyLabels.open} />
               </div>
               <input
                 type="file"
@@ -460,11 +487,14 @@ function Converter() {
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              <span className="text-sm">
-                {uploading
-                  ? `Uploading ${uploadCount} file${uploadCount > 1 ? 's' : ''}...`
-                  : 'Drop files here or click to browse'}
-              </span>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-sm">
+                  {uploading
+                    ? `Uploading ${uploadCount} file${uploadCount > 1 ? 's' : ''}...`
+                    : 'Drop files here or click to browse'}
+                </span>
+                <HotkeyHint label={hotkeyLabels.open} />
+              </div>
             </div>
             <input
               type="file"
@@ -494,18 +524,22 @@ function Converter() {
                 <button
                   onClick={handleConvertAll}
                   disabled={converting || pendingFiles.length === 0}
-                  className="bg-primary hover:bg-primary-dark text-text font-semibold py-2 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 bg-primary hover:bg-primary-dark text-text font-semibold py-2 px-6 rounded-lg transition duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {converting
-                    ? `Converting ${pendingFiles.length} file${pendingFiles.length > 1 ? 's' : ''}...`
-                    : `Convert ${pendingFiles.length} File${pendingFiles.length > 1 ? 's' : ''}`}
+                  <span>
+                    {converting
+                      ? `Converting ${pendingFiles.length} file${pendingFiles.length > 1 ? 's' : ''}...`
+                      : `Convert ${pendingFiles.length} File${pendingFiles.length > 1 ? 's' : ''}`}
+                  </span>
+                  <HotkeyHint label={hotkeyLabels.convert} className="text-text/80" />
                 </button>
                 <button
                   onClick={() => setPendingFiles([])}
                   disabled={converting}
-                  className="text-sm text-text-muted hover:text-text border border-surface-dark hover:border-text-muted py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 text-sm text-text-muted hover:text-text border border-surface-dark hover:border-text-muted py-2 px-4 rounded-lg transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Clear
+                  <span>Clear</span>
+                  <HotkeyHint label={hotkeyLabels.clear} />
                 </button>
               </div>
             </div>
