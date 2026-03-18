@@ -1,8 +1,10 @@
 import os
+import re
 import configparser
 import sqlite3
 import tomllib
 import warnings
+from datetime import date, datetime, time
 
 import pandas as pd
 import pyreadstat
@@ -10,6 +12,7 @@ import toons
 import tomli_w
 import vobject
 import yaml, json
+from pandas.api.types import is_object_dtype, is_scalar
 from typing import Optional
 from .converter_interface import ConverterInterface
 
@@ -30,6 +33,155 @@ def _structured_data_to_dataframe(data):
         return pd.json_normalize(data)
 
     return pd.DataFrame([data])
+
+
+def _to_toml_document(data):
+    if isinstance(data, dict):
+        return data
+
+    return {'data': data}
+
+
+def _to_string_keyed_data(value):
+    if isinstance(value, dict):
+        return {str(key): _to_string_keyed_data(item) for key, item in value.items()}
+
+    if isinstance(value, list):
+        return [_to_string_keyed_data(item) for item in value]
+
+    if isinstance(value, tuple):
+        return [_to_string_keyed_data(item) for item in value]
+
+    return value
+
+
+def _to_toml_compatible(value):
+    if value is None:
+        return ''
+
+    if isinstance(value, dict):
+        return {str(key): _to_toml_compatible(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple, set)):
+        return [_to_toml_compatible(item) for item in value]
+
+    if hasattr(value, 'tolist') and not is_scalar(value):
+        return _to_toml_compatible(value.tolist())
+
+    if hasattr(value, 'item') and not isinstance(value, (str, bytes, bytearray, datetime, date, time)):
+        try:
+            value = value.item()
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    if isinstance(value, pd.Timestamp):
+        return value.to_pydatetime()
+
+    if isinstance(value, pd.Timedelta):
+        return str(value)
+
+    if isinstance(value, float) and pd.isna(value):
+        return ''
+
+    if value is pd.NA or value is pd.NaT:
+        return ''
+
+    return value
+
+
+def _serialize_nested_value(value):
+    if value is None:
+        return None
+
+    if is_scalar(value):
+        return value
+
+    if isinstance(value, set):
+        value = list(value)
+    elif hasattr(value, 'tolist'):
+        value = value.tolist()
+
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _stringify_value(value):
+    if value is None or value is pd.NA or value is pd.NaT:
+        return None
+
+    if isinstance(value, float) and pd.isna(value):
+        return None
+
+    if hasattr(value, 'item') and not isinstance(value, (str, bytes, bytearray, datetime, date, time)):
+        try:
+            value = value.item()
+        except (AttributeError, ValueError, TypeError):
+            pass
+
+    if not is_scalar(value):
+        return _serialize_nested_value(value)
+
+    return str(value)
+
+
+def _sanitize_xml_tag_name(name):
+    sanitized = re.sub(r'[^0-9A-Za-z_.-]+', '_', str(name)).strip('_')
+    if not sanitized:
+        sanitized = 'field'
+    if re.match(r'^[0-9.-]', sanitized) or sanitized.lower().startswith('xml'):
+        sanitized = f'field_{sanitized}'
+    return sanitized
+
+
+def _prepare_dataframe_for_arrow(df):
+    prepared = df.copy()
+    prepared.columns = [str(column) for column in prepared.columns]
+    for column in prepared.columns:
+        series = prepared[column]
+
+        if isinstance(series.dtype, pd.CategoricalDtype):
+            prepared[column] = series.astype('string')
+            continue
+
+        if not is_object_dtype(series.dtype):
+            continue
+
+        non_null = [value for value in series if value is not None and value is not pd.NA and not (isinstance(value, float) and pd.isna(value))]
+        if not non_null:
+            continue
+
+        normalized_types = set()
+        has_nested = False
+        for value in non_null:
+            candidate = value
+            if hasattr(candidate, 'item') and not isinstance(candidate, (str, bytes, bytearray, datetime, date, time)):
+                try:
+                    candidate = candidate.item()
+                except (AttributeError, ValueError, TypeError):
+                    pass
+            if not is_scalar(candidate):
+                has_nested = True
+                break
+            normalized_types.add(type(candidate))
+
+        if has_nested or len(normalized_types) > 1:
+            prepared[column] = series.map(_stringify_value).astype('string')
+
+    return prepared
+
+
+def _prepare_dataframe_for_output(df, output_type):
+    if output_type in {'parquet', 'feather', 'orc'}:
+        return _prepare_dataframe_for_arrow(df)
+
+    if output_type == 'sqlite':
+        return df.apply(lambda column: column.map(_serialize_nested_value))
+
+    if output_type == 'xml':
+        prepared = df.apply(lambda column: column.map(_serialize_nested_value))
+        prepared = prepared.rename(columns=lambda column: _sanitize_xml_tag_name(column))
+        return prepared
+
+    return df
 
 class PandasConverter(ConverterInterface):
     supported_input_formats: set = {
@@ -157,10 +309,10 @@ class PandasConverter(ConverterInterface):
                     yaml.dump(data, f, default_flow_style=False, sort_keys=False)
             elif self.output_type == 'toml':
                 with open(output_file, 'wb') as f:
-                    tomli_w.dump(data, f)
+                    tomli_w.dump(_to_toml_compatible(_to_toml_document(data)), f)
             elif self.output_type == 'toon':
                 with open(output_file, 'w', encoding='utf-8') as f:
-                    toons.dump(data, f)
+                    toons.dump(_to_string_keyed_data(data), f)
             else:  # json
                 with open(output_file, 'w', encoding='utf-8') as f:
                     json.dump(data, f, indent=2)
@@ -264,6 +416,8 @@ class PandasConverter(ConverterInterface):
                             row[field_name] = str(val)
                 rows.append(row)
             df = pd.DataFrame(rows)
+
+        df = _prepare_dataframe_for_output(df, self.output_type)
         
         # Write DataFrame to output format
         if self.output_type == 'csv':
@@ -271,7 +425,7 @@ class PandasConverter(ConverterInterface):
         elif self.output_type == 'xlsx':
             df.to_excel(output_file, index=False)
         elif self.output_type == 'json':
-            df.to_json(output_file, orient='records', indent=2)
+            df.to_json(output_file, orient='records', indent=2, date_format='iso')
         elif self.output_type == 'parquet':
             df.to_parquet(output_file, index=False)
         elif self.output_type == 'feather':
@@ -279,10 +433,10 @@ class PandasConverter(ConverterInterface):
         elif self.output_type == 'orc':
             df.to_orc(output_file, index=False)
         elif self.output_type == 'jsonl':
-            df.to_json(output_file, orient='records', lines=True)
+            df.to_json(output_file, orient='records', lines=True, date_format='iso')
         elif self.output_type == 'toon':
             with open(output_file, 'w', encoding='utf-8') as f:
-                toons.dump(df.to_dict(orient='records'), f)
+                toons.dump(_to_string_keyed_data(df.to_dict(orient='records')), f)
         elif self.output_type == 'sqlite':
             conn = sqlite3.connect(output_file)
             df.to_sql('data', conn, index=False, if_exists='replace')
@@ -304,9 +458,9 @@ class PandasConverter(ConverterInterface):
                 yaml.dump(df.to_dict(orient='records'), f, default_flow_style=False)
         elif self.output_type == 'toml':
             with open(output_file, 'wb') as f:
-                tomli_w.dump({'data': df.to_dict(orient='records')}, f)
+                tomli_w.dump(_to_toml_compatible({'data': df.to_dict(orient='records')}), f)
         elif self.output_type == 'ini':
-            config = configparser.ConfigParser()
+            config = configparser.ConfigParser(interpolation=None)
             if 'section' in df.columns and 'key' in df.columns and 'value' in df.columns:
                 for _, row in df.iterrows():
                     section = str(row['section'])
@@ -318,7 +472,7 @@ class PandasConverter(ConverterInterface):
                 for col in df.columns:
                     for i, val in enumerate(df[col]):
                         config.set('data', f'{col}_{i}', str(val))
-            with open(output_file, 'w') as f:
+            with open(output_file, 'w', encoding='utf-8') as f:
                 config.write(f)
         elif self.output_type == 'env':
             with open(output_file, 'w', encoding='utf-8') as f:
