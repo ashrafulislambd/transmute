@@ -125,6 +125,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setBootstrapStatus({ requires_setup: false, user_count: 0 })
       }
 
+      // Pick up a one-time code returned by the OIDC callback redirect
+      // and exchange it for a JWT. The real token never appears in URLs or logs.
+      const params = new URLSearchParams(window.location.search)
+      const oidcCode = params.get('oidc_code')
+      if (oidcCode) {
+        params.delete('oidc_code')
+        const clean = params.toString()
+        window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
+        try {
+          const { access_token } = await apiJson<{ access_token: string }>(
+            '/api/oidc/exchange',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: oidcCode }),
+            },
+            { auth: false },
+          )
+          setStoredToken(access_token)
+        } catch {
+          // Code was invalid or expired — fall through to unauthenticated
+        }
+      }
+
       const token = getStoredToken()
       if (!token) {
         if (active) setStatus('unauthenticated')

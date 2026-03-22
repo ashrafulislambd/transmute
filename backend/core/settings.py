@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     auth_algorithm: str = "HS256"
     auth_access_token_expire_minutes: int = 60
 
+    # ===== OIDC (optional) =====
+    oidc_issuer_url: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_display_name: str = "SSO"
+    oidc_auto_create_users: bool = True
+
     # ===== Server =====
 
     api_display_host: str = "YOUR_TRANSMUTE_IP"

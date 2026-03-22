@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { FaKey, FaUserPlus } from 'react-icons/fa6'
+import { FaKey, FaUserPlus, FaArrowUpRightFromSquare } from 'react-icons/fa6'
 import { useAuth } from '../AuthContext'
+import { apiJson } from '../utils/api'
 import PasswordField from '../components/PasswordField'
+
+interface OidcConfig {
+  enabled: boolean
+  display_name: string
+}
 
 function Auth() {
   const navigate = useNavigate()
@@ -14,6 +20,13 @@ function Auth() {
   const [fullName, setFullName] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [oidcConfig, setOidcConfig] = useState<OidcConfig | null>(null)
+
+  useEffect(() => {
+    apiJson<OidcConfig>('/api/oidc/config', {}, { auth: false })
+      .then(setOidcConfig)
+      .catch(() => setOidcConfig({ enabled: false, display_name: '' }))
+  }, [])
 
   const returnTo = typeof location.state === 'object' && location.state && 'from' in location.state
     ? String(location.state.from)
@@ -119,6 +132,23 @@ function Auth() {
             >
               {submitting ? 'Working...' : requiresSetup ? 'Create Admin Account' : 'Sign In'}
             </button>
+
+            {oidcConfig?.enabled && (
+              <>
+                <div className="mt-6 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-white/10" />
+                  <span className="text-xs text-text-muted">or</span>
+                  <div className="h-px flex-1 bg-white/10" />
+                </div>
+                <a
+                  href="/api/oidc/login"
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-surface-light/70 px-5 py-3.5 font-semibold text-text transition hover:border-primary/40 hover:bg-surface-light"
+                >
+                  <FaArrowUpRightFromSquare size={14} />
+                  {requiresSetup ? `Bootstrap with ${oidcConfig.display_name}` : `Sign in with ${oidcConfig.display_name}`}
+                </a>
+              </>
+            )}
           </form>
         </section>
       </div>
