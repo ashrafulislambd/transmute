@@ -53,13 +53,18 @@ class Settings(BaseSettings):
     oidc_internal_url: str = ""  # Backend-to-provider URL (for Docker); falls back to oidc_issuer_url
     oidc_client_id: str = ""
     oidc_client_secret: str = ""
-    oidc_redirect_uri: str = ""  # Explicit callback URL; required when behind a reverse proxy
     oidc_display_name: str = "SSO"
     oidc_auto_create_users: bool = True
 
     # ===== Server =====
 
-    api_display_host: str = "YOUR_TRANSMUTE_IP"
+    # http://192.168.1.1:3313
+    # https://transmute.yourdomain.com
+    # etc. Used for constructing URLs in OIDC API response etc.
+
+    # Not strictly required, but recommended to set if running behind a reverse
+    # proxy or if the app should be reachable at a different URL than http://{host}:{port}
+    app_url: str = ""
 
     # Binding to all interfaces is required as this app should be reachable from
     # other machines besides just localhost
@@ -79,7 +84,7 @@ class Settings(BaseSettings):
         self.output_dir = self.data_dir / "outputs"
         self.tmp_dir = self.data_dir / "tmp"
 
-        self.api_server_url = f"http://{self.api_display_host}:{self.port}"
+        self.api_server_url = self.app_url if self.app_url else f"http://{self.host}:{self.port}"
 
         # Ensure directories exist
         for path in [
