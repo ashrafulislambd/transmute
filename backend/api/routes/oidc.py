@@ -127,6 +127,7 @@ def oidc_config():
         "enabled": _oidc_enabled(),
         "display_name": settings.oidc_display_name,
         "allow_unauthenticated": settings.allow_unauthenticated,
+        "auto_launch": settings.oidc_auto_launch,
     }
 
 

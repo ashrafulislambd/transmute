@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     oidc_client_secret: str = ""
     oidc_display_name: str = "SSO"
     oidc_auto_create_users: bool = True
+    oidc_auto_launch: bool = False  # If True, automatically redirect to OIDC login when accessing /auth
 
     # ===== Guest Access =====
     allow_unauthenticated: bool = False

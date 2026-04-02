@@ -9,6 +9,7 @@ interface OidcConfig {
   enabled: boolean
   display_name: string
   allow_unauthenticated: boolean
+  auto_launch: boolean
 }
 
 function Auth() {
@@ -24,17 +25,29 @@ function Auth() {
   const [oidcConfig, setOidcConfig] = useState<OidcConfig | null>(null)
   const [showLocalLogin, setShowLocalLogin] = useState(false)
 
+  const requiresSetup = bootstrapStatus?.requires_setup ?? false
+
   useEffect(() => {
     apiJson<OidcConfig>('/api/oidc/config', {}, { auth: false })
       .then(setOidcConfig)
-      .catch(() => setOidcConfig({ enabled: false, display_name: '', allow_unauthenticated: false }))
+      .catch(() => setOidcConfig({ enabled: false, display_name: '', allow_unauthenticated: false, auto_launch: false }))
   }, [])
+
+  useEffect(() => {
+    if (oidcConfig?.auto_launch && oidcConfig.enabled && !requiresSetup) {
+      window.location.href = '/api/oidc/login'
+    }
+  }, [oidcConfig, requiresSetup])
 
   const returnTo = typeof location.state === 'object' && location.state && 'from' in location.state
     ? String(location.state.from)
     : '/'
 
-  const requiresSetup = bootstrapStatus?.requires_setup ?? false
+  // While config is loading or auto-launch redirect is pending, show nothing
+  const autoLaunching = oidcConfig?.auto_launch && oidcConfig.enabled && !requiresSetup
+  if (oidcConfig === null || autoLaunching) {
+    return <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(var(--color-primary),0.35),_transparent_38%),linear-gradient(135deg,_rgb(var(--color-surface-dark)),_rgb(var(--color-surface-light))_55%,_rgb(var(--color-surface-dark)))]" />
+  }
 
   // When OIDC is enabled and not in setup mode, default to showing the OIDC-primary view
   const oidcPrimary = !!oidcConfig?.enabled && !requiresSetup && !showLocalLogin
