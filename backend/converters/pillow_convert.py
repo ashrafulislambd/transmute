@@ -101,6 +101,12 @@ class PillowConverter(ConverterInterface):
     }
     formats_with_qualities = {
         'jpeg',
+        'webp',
+        'avif',
+        'jxl',
+        'jp2',
+        'heif',
+        'heic',
     }
     
     def __init__(self, input_file: str, output_dir: str, input_type: str, output_type: str):
@@ -273,7 +279,7 @@ class PillowConverter(ConverterInterface):
 
             # Set quality parameters
             save_kwargs = {}
-            if output_fmt in ['jpg', 'jpeg', 'webp', 'avif', 'jxl']:
+            if output_fmt in ['jpg', 'jpeg', 'webp', 'avif', 'jxl', 'heif', 'heic']:
                 if quality == 'high':
                     save_kwargs['quality'] = 95
                 elif quality == 'low':

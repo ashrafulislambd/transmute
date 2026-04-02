@@ -86,7 +86,8 @@ def test_conversion(sample_name, input_fmt, output_fmt, converter_name, safe_pat
         f"{converter_cls.__name__} reports it cannot convert {input_fmt} -> {output_fmt}"
     )
 
-    output_files = converter.convert()
+    # Run at low quality to speed up tests, since we're just checking for non-empty output files.
+    output_files = converter.convert(quality="low")
 
     assert output_files, "convert() returned an empty list"
     for fpath in output_files:
